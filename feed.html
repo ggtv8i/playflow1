@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>PlayFlow — الاستكشاف</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow:hidden; background:var(--bg); }
+
+    /* ─── Top Bar ─── */
+    .top-bar {
+      position:fixed; top:0; left:0; right:0; height:52px; z-index:500;
+      background:rgba(7,7,14,0.92); backdrop-filter:blur(20px);
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 16px;
+    }
+    .top-logo { font-family:'Orbitron',sans-serif; font-size:17px; font-weight:700; color:var(--cyan); text-shadow:0 0 15px rgba(0,245,212,0.5); }
+    .top-tabs { display:flex; gap:4px; }
+    .tab-btn {
+      padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600;
+      color:var(--muted); transition:all 0.25s; cursor:pointer;
+    }
+    .tab-btn.active { background:rgba(0,245,212,0.12); color:var(--cyan); }
+    .top-actions { display:flex; gap:10px; }
+    .icon-btn {
+      width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,0.05);
+      display:flex; align-items:center; justify-content:center;
+      color:var(--muted); transition:all 0.2s; cursor:pointer;
+    }
+    .icon-btn:hover { color:var(--cyan); background:rgba(0,245,212,0.1); }
+    .icon-btn svg { width:18px;height:18px; }
+
+    /* ─── Feed ─── */
+    .feed {
+      position:fixed; top:52px; left:0; right:0; bottom:58px;
+      overflow-y:scroll; scroll-snap-type:y mandatory;
+      scrollbar-width:none;
+    }
+    .feed::-webkit-scrollbar { display:none; }
+
+    /* ─── Game Section ─── */
+    .game-section {
+      width:100%; height:100%; position:relative;
+      scroll-snap-align:start; scroll-snap-stop:always;
+      display:flex; align-items:center; justify-content:center;
+      overflow:hidden;
+    }
+    .game-section canvas {
+      display:block;
+      max-width:100%; max-height:100%;
+      object-fit:contain;
+    }
+
+    /* ─── Game overlay (bottom-left info) ─── */
+    .game-info {
+      position:absolute; bottom:20px; left:16px; right:80px;
+      pointer-events:none; z-index:10;
+    }
+    .game-info .gi-creator {
+      display:flex; align-items:center; gap:8px; margin-bottom:8px;
+    }
+    .gi-avatar {
+      width:38px;height:38px;border-radius:50%;
+      background:linear-gradient(135deg,var(--cyan),var(--purple));
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:#fff;
+      border:2px solid rgba(0,245,212,0.4); flex-shrink:0;
+    }
+    .gi-name { font-weight:700; font-size:14px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.8); }
+    .gi-handle { font-size:12px; color:rgba(255,255,255,0.6); }
+    .game-info h3 {
+      font-family:'Orbitron',sans-serif; font-size:16px; font-weight:700;
+      color:#fff; text-shadow:0 2px 12px rgba(0,0,0,0.9);
+      margin-bottom:6px; line-height:1.3;
+    }
+    .game-info p { font-size:13px; color:rgba(255,255,255,0.75); text-shadow:0 1px 6px rgba(0,0,0,0.8); line-height:1.5; }
+    .game-tags { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+    .game-tag {
+      padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600;
+      background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.8);
+      border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(8px);
+    }
+
+    /* ─── Action Sidebar ─── */
+    .action-sidebar {
+      position:absolute; right:12px; bottom:24px; z-index:20;
+      display:flex; flex-direction:column; align-items:center; gap:20px;
+    }
+    .action-btn {
+      display:flex; flex-direction:column; align-items:center; gap:5px;
+      cursor:pointer; transition:transform 0.2s;
+    }
+    .action-btn:hover { transform:scale(1.1); }
+    .action-icon {
+      width:44px; height:44px; border-radius:50%;
+      background:rgba(255,255,255,0.1); backdrop-filter:blur(12px);
+      border:1px solid rgba(255,255,255,0.15);
+      display:flex; align-items:center; justify-content:center;
+      transition:all 0.25s;
+    }
+    .action-icon svg { width:22px;height:22px;color:#fff; }
+    .action-count { font-size:12px; font-weight:700; color:#fff; text-shadow:0 1px 6px rgba(0,0,0,0.8); }
+
+    .action-btn.liked .action-icon     { background:rgba(247,37,133,0.25); border-color:var(--pink); box-shadow:0 0 15px rgba(247,37,133,0.4); }
+    .action-btn.liked .action-icon svg { color:var(--pink); animation:heartPop 0.4s ease; }
+    .action-btn.saved .action-icon     { background:rgba(0,245,212,0.2); border-color:var(--cyan); box-shadow:0 0 15px rgba(0,245,212,0.3); }
+    .action-btn.saved .action-icon svg { color:var(--cyan); }
+
+    /* ─── Play/Pause overlay hint ─── */
+    .play-hint {
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      background:rgba(0,0,0,0.5); border-radius:50%; width:64px;height:64px;
+      display:flex;align-items:center;justify-content:center;
+      pointer-events:none; opacity:0; transition:opacity 0.5s;
+      z-index:5;
+    }
+    .play-hint svg { width:28px;height:28px;color:#fff; }
+    .play-hint.show { opacity:1; animation:fadeIn 0.2s ease; }
+
+    /* ─── Section BGs ─── */
+    .s1-bg { background:radial-gradient(ellipse at 20% 30%,rgba(0,245,212,0.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 80%,rgba(247,37,133,0.05) 0%,transparent 60%),#07070e; }
+    .s2-bg { background:radial-gradient(ellipse at 80% 20%,rgba(114,9,183,0.08) 0%,transparent 60%),radial-gradient(ellipse at 20% 80%,rgba(67,97,238,0.07) 0%,transparent 60%),#07070e; }
+    .s3-bg { background:radial-gradient(ellipse at 50% 10%,rgba(0,245,212,0.07) 0%,transparent 60%),#070714; }
+    .s4-bg { background:radial-gradient(ellipse at 10% 50%,rgba(247,37,133,0.06) 0%,transparent 60%),radial-gradient(ellipse at 90% 50%,rgba(0,245,212,0.05) 0%,transparent 60%),#07070e; }
+    .s5-bg { background:radial-gradient(ellipse at 50% 50%,rgba(114,9,183,0.08) 0%,transparent 70%),#07070e; }
+
+    /* ─── Controls hint overlay ─── */
+    .ctrl-hint {
+      position:absolute; top:60px; left:50%; transform:translateX(-50%);
+      padding:6px 14px; border-radius:20px;
+      background:rgba(0,0,0,0.55); backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,0.1);
+      font-size:11px; color:rgba(255,255,255,0.6);
+      letter-spacing:0.5px; white-space:nowrap; pointer-events:none;
+      z-index:10; transition:opacity 1s;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <span class="top-logo">▶ PlayFlow</span>
+    <div class="top-tabs">
+      <div class="tab-btn active">لك</div>
+      <div class="tab-btn">متداول</div>
+      <div class="tab-btn">جديد</div>
+    </div>
+    <div class="top-actions">
+      <div class="icon-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+      <a href="profile.html" class="icon-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- Feed -->
+  <div class="feed" id="feed">
+
+    <!-- ══════ GAME 1: NEON SNAKE ══════ -->
+    <section class="game-section s1-bg" data-game="snake" id="sec-snake">
+      <canvas id="c-snake"></canvas>
+      <div class="ctrl-hint" id="hint-snake">↑↓←→ · WASD · سحب بالأصبع</div>
+      <div class="game-info">
+        <div class="gi-creator">
+          <div class="gi-avatar">NX</div>
+          <div><div class="gi-name">NeonXDev</div><div class="gi-handle">@neonxdev</div></div>
+        </div>
+        <h3>🐍 Neon Snake</h3>
+        <p>الكلاسيكية بلمسة مستقبلية — كل حبة طاقة تزيد من حجمك وسرعتك</p>
+        <div class="game-tags"><span class="game-tag">كلاسيك</span><span class="game-tag">لا نهائي</span><span class="game-tag">مهارة</span></div>
+      </div>
+      <div class="action-sidebar">
+        <div class="action-btn" data-game="snake" data-action="like" onclick="toggleLike(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <span class="action-count">4.2K</span>
+        </div>
+        <div class="action-btn" onclick="showComments()">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">318</span>
+        </div>
+        <div class="action-btn" data-game="snake" data-action="save" onclick="toggleSave(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">حفظ</span>
+        </div>
+        <div class="action-btn" onclick="shareGame('Neon Snake')">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+          <span class="action-count">مشاركة</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ GAME 2: CYBER BREAKOUT ══════ -->
+    <section class="game-section s2-bg" data-game="breakout" id="sec-breakout">
+      <canvas id="c-breakout"></canvas>
+      <div class="ctrl-hint" id="hint-breakout">حرك الفأرة أو المس يميناً/يساراً</div>
+      <div class="game-info">
+        <div class="gi-creator">
+          <div class="gi-avatar">CP</div>
+          <div><div class="gi-name">CyberPixel</div><div class="gi-handle">@cyberpixel</div></div>
+        </div>
+        <h3>🧱 Cyber Breakout</h3>
+        <p>حطّم الجدران الإلكترونية ببراعة — ثلاث أرواح لاختراق كل الطبقات</p>
+        <div class="game-tags"><span class="game-tag">أركيد</span><span class="game-tag">مستويات</span><span class="game-tag">منافسة</span></div>
+      </div>
+      <div class="action-sidebar">
+        <div class="action-btn" data-game="breakout" data-action="like" onclick="toggleLike(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <span class="action-count">7.8K</span>
+        </div>
+        <div class="action-btn" onclick="showComments()">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">512</span>
+        </div>
+        <div class="action-btn" data-game="breakout" data-action="save" onclick="toggleSave(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">حفظ</span>
+        </div>
+        <div class="action-btn" onclick="shareGame('Cyber Breakout')">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+          <span class="action-count">مشاركة</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ GAME 3: FLAPPY ORB ══════ -->
+    <section class="game-section s3-bg" data-game="flappy" id="sec-flappy">
+      <canvas id="c-flappy"></canvas>
+      <div class="ctrl-hint" id="hint-flappy">المس / اضغط SPACE للقفز</div>
+      <div class="game-info">
+        <div class="gi-creator">
+          <div class="gi-avatar">GW</div>
+          <div><div class="gi-name">GalaxiWave</div><div class="gi-handle">@galaxiwave</div></div>
+        </div>
+        <h3>🔮 Flappy Orb</h3>
+        <p>أحكم السيطرة على الكرة الضوئية وابتعد عن العوائق الكونية</p>
+        <div class="game-tags"><span class="game-tag">ردود أفعال</span><span class="game-tag">تسلا</span><span class="game-tag">عشوائي</span></div>
+      </div>
+      <div class="action-sidebar">
+        <div class="action-btn" data-game="flappy" data-action="like" onclick="toggleLike(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <span class="action-count">12.1K</span>
+        </div>
+        <div class="action-btn" onclick="showComments()">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">1.4K</span>
+        </div>
+        <div class="action-btn" data-game="flappy" data-action="save" onclick="toggleSave(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">حفظ</span>
+        </div>
+        <div class="action-btn" onclick="shareGame('Flappy Orb')">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+          <span class="action-count">مشاركة</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ GAME 4: PIXEL DASH ══════ -->
+    <section class="game-section s4-bg" data-game="dash" id="sec-dash">
+      <canvas id="c-dash"></canvas>
+      <div class="ctrl-hint" id="hint-dash">SPACE / المس للقفز · قفزتان مسموح</div>
+      <div class="game-info">
+        <div class="gi-creator">
+          <div class="gi-avatar">RN</div>
+          <div><div class="gi-name">RunnerNova</div><div class="gi-handle">@runnernova</div></div>
+        </div>
+        <h3>🤖 Pixel Dash</h3>
+        <p>روبوت نيون يركض بلا توقف — تجنب العوائق وحطم الأرقام القياسية</p>
+        <div class="game-tags"><span class="game-tag">لا نهائي</span><span class="game-tag">سرعة</span><span class="game-tag">قفز مزدوج</span></div>
+      </div>
+      <div class="action-sidebar">
+        <div class="action-btn" data-game="dash" data-action="like" onclick="toggleLike(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <span class="action-count">9.3K</span>
+        </div>
+        <div class="action-btn" onclick="showComments()">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">876</span>
+        </div>
+        <div class="action-btn" data-game="dash" data-action="save" onclick="toggleSave(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">حفظ</span>
+        </div>
+        <div class="action-btn" onclick="shareGame('Pixel Dash')">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+          <span class="action-count">مشاركة</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ GAME 5: MEMORY MATRIX ══════ -->
+    <section class="game-section s5-bg" data-game="memory" id="sec-memory">
+      <canvas id="c-memory"></canvas>
+      <div class="ctrl-hint" id="hint-memory">المس البطاقات لكشف الأزواج</div>
+      <div class="game-info">
+        <div class="gi-creator">
+          <div class="gi-avatar">MM</div>
+          <div><div class="gi-name">MindMatrix</div><div class="gi-handle">@mindmatrix</div></div>
+        </div>
+        <h3>🧠 Memory Matrix</h3>
+        <p>تحدّ ذاكرتك الكمية — طابق الأزواج بأقل عدد من الحركات</p>
+        <div class="game-tags"><span class="game-tag">ذاكرة</span><span class="game-tag">استراتيجية</span><span class="game-tag">وقت</span></div>
+      </div>
+      <div class="action-sidebar">
+        <div class="action-btn" data-game="memory" data-action="like" onclick="toggleLike(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <span class="action-count">5.6K</span>
+        </div>
+        <div class="action-btn" onclick="showComments()">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">420</span>
+        </div>
+        <div class="action-btn" data-game="memory" data-action="save" onclick="toggleSave(this)">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
+          <span class="action-count">حفظ</span>
+        </div>
+        <div class="action-btn" onclick="shareGame('Memory Matrix')">
+          <div class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+          <span class="action-count">مشاركة</span>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /feed -->
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <a href="feed.html" class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      الرئيسية
+    </a>
+    <a href="#" class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      استكشاف
+    </a>
+    <a href="create.html" class="nav-item nav-create">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      أنشئ
+    </a>
+    <a href="#" class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      مكتبتي
+    </a>
+    <a href="profile.html" class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      ملفي
+    </a>
+  </nav>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+  // ═══════════════════════════════════════════════
+  //  UTILITIES
+  // ═══════════════════════════════════════════════
+  function showToast(msg,duration=2200){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.classList.add('show');
+    clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),duration);
+  }
+  function toggleLike(btn){
+    btn.classList.toggle('liked');
+    const count=btn.querySelector('.action-count');
+    const n=parseInt(count.textContent.replace(/[^\d]/g,''))||0;
+    if(btn.classList.contains('liked')){count.textContent=formatNum(n+1);showToast('❤️ أُضيفت للمفضلة');}
+    else{count.textContent=formatNum(n-1);}
+  }
+  function toggleSave(btn){
+    btn.classList.toggle('saved');
+    showToast(btn.classList.contains('saved')?'🔖 حُفظت في مكتبتك':'تم إلغاء الحفظ');
+  }
+  function shareGame(name){
+    if(navigator.share){navigator.share({title:name+' على PlayFlow',url:location.href});}
+    else{navigator.clipboard&&navigator.clipboard.writeText(location.href);showToast('🔗 تم نسخ الرابط');}
+  }
+  function showComments(){showToast('💬 التعليقات — قريباً!');}
+  function formatNum(n){return n>=1000?(n/1000).toFixed(1)+'K':''+n;}
+
+  // ═══════════════════════════════════════════════
+  //  CANVAS SIZING
+  // ═══════════════════════════════════════════════
+  function sizeCanvas(canvas){
+    const sec=canvas.closest('.game-section');
+    const W=sec.clientWidth, H=sec.clientHeight;
+    const px=window.devicePixelRatio||1;
+    canvas.width=W*px; canvas.height=H*px;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    const ctx=canvas.getContext('2d');
+    ctx.scale(px,px);
+    return {W,H,ctx};
+  }
+
+  // ═══════════════════════════════════════════════
+  //  GAME 1: NEON SNAKE
+  // ═══════════════════════════════════════════════
+  class SnakeGame{
+    constructor(canvas){
+      this.canvas=canvas;
+      const {W,H,ctx}=sizeCanvas(canvas);
+      this.W=W; this.H=H; this.ctx=ctx;
+      this.CELL=Math.floor(Math.min(W,H)/22);
+      this.COLS=Math.floor(W/this.CELL);
+      this.ROWS=Math.floor(H/this.CELL);
+      this.active=false; this.animId=null;
+      this.lastT=0; this.tickMs=140;
+      this.reset();
+      this.bindKeys();
+      this.draw();
+    }
+    reset(){
+      const cx=Math.floor(this.COLS/2), cy=Math.floor(this.ROWS/2);
+      this.snake=[{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
+      this.dir={x:1,y:0}; this.nextDir={x:1,y:0};
+      this.food=this.spawnFood();
+      this.score=0; this.dead=false; this.started=false;
+      this.particles=[];
+    }
+    spawnFood(){
+      let pos;
+      do{pos={x:Math.floor(Math.random()*this.COLS),y:Math.floor(Math.random()*this.ROWS)};}
+      while(this.snake&&this.snake.some(s=>s.x===pos.x&&s.y===pos.y));
+      return pos;
+    }
+    bindKeys(){
+      this._onKey=e=>{
+        const k=e.key;
+        if(k==='ArrowUp'   ||k==='w'||k==='W'){if(this.dir.y!==1) this.nextDir={x:0,y:-1};}
+        if(k==='ArrowDown' ||k==='s'||k==='S'){if(this.dir.y!==-1)this.nextDir={x:0,y:1};}
+        if(k==='ArrowLeft' ||k==='a'||k==='A'){if(this.dir.x!==1) this.nextDir={x:-1,y:0};}
+        if(k==='ArrowRight'||k==='d'||k==='D'){if(this.dir.x!==-1)this.nextDir={x:1,y:0};}
+        if(!this.started&&!this.dead){this.started=true;}
+        if(this.dead){this.reset();this.started=true;}
+      };
+      document.addEventListener('keydown',this._onKey);
+      // Touch swipe
+      let tx0,ty0;
+      this.canvas.addEventListener('touchstart',e=>{tx0=e.touches[0].clientX;ty0=e.touches[0].clientY;},{passive:true});
+      this.canvas.addEventListener('touchend',e=>{
+        if(!this.active)return;
+        const dx=e.changedTouches[0].clientX-tx0, dy=e.changedTouches[0].clientY-ty0;
+        if(Math.abs(dx)<10&&Math.abs(dy)<10){
+          if(this.dead){this.reset();this.started=true;}else{this.started=true;}return;
+        }
+        if(Math.abs(dx)>Math.abs(dy)){
+          if(dx>0&&this.dir.x!==-1)this.nextDir={x:1,y:0};
+          else if(dx<0&&this.dir.x!==1)this.nextDir={x:-1,y:0};
+        }else{
+          if(dy>0&&this.dir.y!==-1)this.nextDir={x:0,y:1};
+          else if(dy<0&&this.dir.y!==1)this.nextDir={x:0,y:-1};
+        }
+        if(!this.started)this.started=true;
+      },{passive:true});
+    }
+    tick(){
+      if(this.dead||!this.started)return;
+      this.dir=this.nextDir;
+      const head={x:this.snake[0].x+this.dir.x,y:this.snake[0].y+this.dir.y};
+      if(head.x<0||head.x>=this.COLS||head.y<0||head.y>=this.ROWS){this.dead=true;return;}
+      if(this.snake.some(s=>s.x===head.x&&s.y===head.y)){this.dead=true;return;}
+      this.snake.unshift(head);
+      if(head.x===this.food.x&&head.y===this.food.y){
+        this.score+=10;
+        this.food=this.spawnFood();
+        this.tickMs=Math.max(70,this.tickMs-2);
+        for(let i=0;i<8;i++)this.particles.push({x:head.x*this.CELL+this.CELL/2,y:head.y*this.CELL+this.CELL/2,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:1,color:'#f72585'});
+      }else{this.snake.pop();}
+      this.particles=this.particles.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.life-=0.08;return p.life>0;});
+    }
+    draw(){
+      const{ctx,W,H,CELL}=this;
+      ctx.fillStyle='#07070e'; ctx.fillRect(0,0,W,H);
+      // Grid
+      ctx.strokeStyle='rgba(0,245,212,0.04)';ctx.lineWidth=0.5;
+      for(let i=0;i<=this.COLS;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,H);ctx.stroke();}
+      for(let j=0;j<=this.ROWS;j++){ctx.beginPath();ctx.moveTo(0,j*CELL);ctx.lineTo(W,j*CELL);ctx.stroke();}
+      // Particles
+      this.particles.forEach(p=>{ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();});
+      ctx.globalAlpha=1;
+      // Food
+      const ft=Date.now()/800;
+      ctx.shadowColor='#f72585';ctx.shadowBlur=15+Math.sin(ft)*5;
+      ctx.fillStyle='#f72585';
+      ctx.beginPath();ctx.arc(this.food.x*CELL+CELL/2,this.food.y*CELL+CELL/2,CELL/2-3,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;
+      // Snake
+      this.snake.forEach((seg,i)=>{
+        const a=1-(i/this.snake.length)*0.55;
+        ctx.shadowColor='#00f5d4';ctx.shadowBlur=i===0?18:4;
+        ctx.fillStyle=i===0?'#00f5d4':`rgba(0,245,212,${a})`;
+        ctx.fillRect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2);
+        if(i===0){
+          ctx.shadowBlur=0;ctx.fillStyle='#07070e';
+          const ex=seg.x*CELL+CELL/2+this.dir.x*3,ey=seg.y*CELL+CELL/2+this.dir.y*3;
+          ctx.beginPath();ctx.arc(ex-this.dir.y*3,ey+this.dir.x*3,2,0,Math.PI*2);ctx.fill();
+          ctx.beginPath();ctx.arc(ex+this.dir.y*3,ey-this.dir.x*3,2,0,Math.PI*2);ctx.fill();
+        }
+      });
+      ctx.shadowBlur=0;
+      // Score
+      ctx.shadowColor='#00f5d4';ctx.shadowBlur=10;
+      ctx.fillStyle='#00f5d4';ctx.font=`bold ${Math.max(14,CELL*0.7)}px Orbitron,monospace`;
+      ctx.textAlign='left';ctx.fillText('SCORE: '+this.score,12,Math.max(22,CELL*0.9));
+      ctx.shadowBlur=0;
+      // Overlay
+      if(!this.started){
+        ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#00f5d4';ctx.shadowBlur=25;
+        ctx.fillStyle='#00f5d4';ctx.font='bold 22px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('NEON SNAKE',W/2,H/2-22);
+        ctx.shadowBlur=0;ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='14px Rajdhani,sans-serif';
+        ctx.fillText('اضغط أي مفتاح أو المس للبدء',W/2,H/2+12);
+      }
+      if(this.dead){
+        ctx.fillStyle='rgba(0,0,0,0.78)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#f72585';ctx.shadowBlur=28;
+        ctx.fillStyle='#f72585';ctx.font='bold 28px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('GAME OVER',W/2,H/2-32);ctx.shadowBlur=0;
+        ctx.fillStyle='#00f5d4';ctx.font='bold 20px Orbitron,monospace';
+        ctx.fillText('SCORE: '+this.score,W/2,H/2+10);
+        ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px Rajdhani,sans-serif';
+        ctx.fillText('المس للعب مجدداً',W/2,H/2+40);
+      }
+    }
+    loop(t){
+      if(!this.active){return;}
+      if(t-this.lastT>this.tickMs){this.tick();this.lastT=t;}
+      this.draw();
+      this.animId=requestAnimationFrame(ts=>this.loop(ts));
+    }
+    start(){this.active=true;this.animId=requestAnimationFrame(ts=>this.loop(ts));}
+    stop(){this.active=false;if(this.animId)cancelAnimationFrame(this.animId);}
+  }
+
+  // ═══════════════════════════════════════════════
+  //  GAME 2: CYBER BREAKOUT
+  // ═══════════════════════════════════════════════
+  class BreakoutGame{
+    constructor(canvas){
+      this.canvas=canvas;
+      const{W,H,ctx}=sizeCanvas(canvas);
+      this.W=W;this.H=H;this.ctx=ctx;
+      this.active=false;this.animId=null;
+      this.mouseX=W/2;
+      this.reset();
+      this.bindEvents();
+      this.draw();
+    }
+    reset(){
+      const{W,H}=this;
+      this.ball={x:W/2,y:H*0.68,vx:3.5,vy:-3.5,r:9};
+      this.paddle={x:W/2-55,y:H-65,w:110,h:14};
+      this.score=0;this.lives=3;this.started=false;this.dead=false;this.won=false;
+      const cols=8,rows=5,pad=8;
+      const bW=(W-pad*2)/cols-4, bH=20;
+      const colors=['#f72585','#b5179e','#7209b7','#3a0ca3','#4361ee'];
+      this.bricks=[];
+      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)
+        this.bricks.push({x:pad+c*(bW+4),y:56+r*(bH+4),w:bW,h:bH,color:colors[r],alive:true});
+    }
+    bindEvents(){
+      this.canvas.addEventListener('mousemove',e=>{
+        const r=this.canvas.getBoundingClientRect();
+        this.mouseX=e.clientX-r.left;
+        if(!this.started&&!this.dead)this.started=true;
+      });
+      this.canvas.addEventListener('touchmove',e=>{
+        e.preventDefault();
+        const r=this.canvas.getBoundingClientRect();
+        this.mouseX=e.touches[0].clientX-r.left;
+        if(!this.started&&!this.dead)this.started=true;
+      },{passive:false});
+      this.canvas.addEventListener('click',()=>{
+        if(this.dead||this.won){this.reset();}
+        else if(!this.started)this.started=true;
+      });
+    }
+    update(){
+      if(!this.started||this.dead||this.won)return;
+      const{W,H,ball,paddle}=this;
+      paddle.x=Math.max(0,Math.min(W-paddle.w,this.mouseX-paddle.w/2));
+      ball.x+=ball.vx;ball.y+=ball.vy;
+      if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx);}
+      if(ball.x+ball.r>W){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx);}
+      if(ball.y-ball.r<0){ball.y=ball.r;ball.vy=Math.abs(ball.vy);}
+      if(ball.y>H+40){
+        this.lives--;
+        if(this.lives<=0){this.dead=true;return;}
+        ball.x=W/2;ball.y=H*0.68;ball.vx=3.5;ball.vy=-3.5;this.started=false;
+      }
+      if(ball.y+ball.r>=paddle.y&&ball.y-ball.r<=paddle.y+paddle.h&&ball.x>=paddle.x&&ball.x<=paddle.x+paddle.w){
+        const hp=(ball.x-paddle.x)/paddle.w-0.5;
+        ball.vy=-Math.abs(ball.vy); ball.vx=hp*9;
+        const spd=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy),target=5+this.score/150;
+        ball.vx=ball.vx/spd*target;ball.vy=ball.vy/spd*target;
+      }
+      for(const b of this.bricks){
+        if(!b.alive)continue;
+        if(ball.x+ball.r>b.x&&ball.x-ball.r<b.x+b.w&&ball.y+ball.r>b.y&&ball.y-ball.r<b.y+b.h){
+          b.alive=false;ball.vy*=-1;this.score+=10;break;
+        }
+      }
+      if(this.bricks.every(b=>!b.alive))this.won=true;
+    }
+    draw(){
+      const{ctx,W,H,ball,paddle}=this;
+      ctx.fillStyle='#07070e';ctx.fillRect(0,0,W,H);
+      // Bricks
+      this.bricks.forEach(b=>{
+        if(!b.alive)return;
+        ctx.shadowColor=b.color;ctx.shadowBlur=8;
+        ctx.fillStyle=b.color+'22';ctx.fillRect(b.x,b.y,b.w,b.h);
+        ctx.strokeStyle=b.color;ctx.lineWidth=1.5;ctx.strokeRect(b.x+1,b.y+1,b.w-2,b.h-2);
+        ctx.shadowBlur=0;
+      });
+      // Paddle
+      ctx.shadowColor='#00f5d4';ctx.shadowBlur=20;
+      const g=ctx.createLinearGradient(paddle.x,0,paddle.x+paddle.w,0);
+      g.addColorStop(0,'#00f5d4');g.addColorStop(1,'#4361ee');
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.roundRect(paddle.x,paddle.y,paddle.w,paddle.h,7);ctx.fill();
+      ctx.shadowBlur=0;
+      // Ball
+      ctx.shadowColor='#f72585';ctx.shadowBlur=22;
+      ctx.fillStyle='#f72585';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;
+      // HUD
+      ctx.shadowColor='#00f5d4';ctx.shadowBlur=8;
+      ctx.fillStyle='#00f5d4';ctx.font='bold 14px Orbitron,monospace';ctx.textAlign='left';
+      ctx.fillText('SCORE: '+this.score,12,28);
+      ctx.shadowBlur=0;ctx.fillStyle='#f72585';ctx.textAlign='right';
+      ctx.fillText('♥'.repeat(Math.max(0,this.lives)),W-12,28);
+      // Overlays
+      if(!this.started){
+        ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#7209b7';ctx.shadowBlur=25;
+        ctx.fillStyle='#c77dff';ctx.font='bold 22px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('CYBER BREAKOUT',W/2,H/2-22);ctx.shadowBlur=0;
+        ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='14px Rajdhani,sans-serif';
+        ctx.fillText('حرك الفأرة أو المس للبدء',W/2,H/2+12);
+      }
+      if(this.dead){
+        ctx.fillStyle='rgba(0,0,0,0.8)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#f72585';ctx.shadowBlur=28;
+        ctx.fillStyle='#f72585';ctx.font='bold 28px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('GAME OVER',W/2,H/2-30);ctx.shadowBlur=0;
+        ctx.fillStyle='#00f5d4';ctx.font='20px Orbitron,monospace';ctx.fillText('SCORE: '+this.score,W/2,H/2+10);
+        ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px Rajdhani,sans-serif';ctx.fillText('المس للمحاولة مجدداً',W/2,H/2+42);
+      }
+      if(this.won){
+        ctx.fillStyle='rgba(0,0,0,0.8)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#00f5d4';ctx.shadowBlur=30;
+        ctx.fillStyle='#00f5d4';ctx.font='bold 26px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('YOU WIN! 🎉',W/2,H/2-20);ctx.shadowBlur=0;
+        ctx.fillStyle='#ffd166';ctx.font='20px Orbitron,monospace';ctx.fillText('SCORE: '+this.score,W/2,H/2+22);
+      }
+    }
+    loop(){if(!this.active)return;this.update();this.draw();this.animId=requestAnimationFrame(()=>this.loop());}
+    start(){this.active=true;this.animId=requestAnimationFrame(()=>this.loop());}
+    stop(){this.active=false;if(this.animId)cancelAnimationFrame(this.animId);}
+  }
+
+  // ═══════════════════════════════════════════════
+  //  GAME 3: FLAPPY ORB
+  // ═══════════════════════════════════════════════
+  class FlappyGame{
+    constructor(canvas){
+      this.canvas=canvas;
+      const{W,H,ctx}=sizeCanvas(canvas);
+      this.W=W;this.H=H;this.ctx=ctx;
+      this.G=0.45;this.JF=-9;this.PW=55;this.GAP=155;this.PS=2.8;
+      this.active=false;this.animId=null;
+      this.stars=Array.from({length:60},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+0.5,twinkle:Math.random()*Math.PI*2}));
+      this.reset();
+      this.bindEvents();
+      this.draw();
+    }
+    reset(){
+      const{W,H}=this;
+      this.bird={x:W*0.26,y:H*0.5,vy:0,r:14};
+      this.pipes=[];this.score=0;this.dead=false;this.started=false;
+      this.frame=0;this.nextPipe=70;
+    }
+    jump(){
+      if(this.dead){this.reset();return;}
+      if(!this.started)this.started=true;
+      this.bird.vy=this.JF;
+    }
+    bindEvents(){
+      this.canvas.addEventListener('click',()=>{if(this.active)this.jump();});
+      this.canvas.addEventListener('touchstart',e=>{e.preventDefault();if(this.active)this.jump();},{passive:false});
+      this._onKey=e=>{if(e.code==='Space'&&this.active){e.preventDefault();this.jump();}};
+      document.addEventListener('keydown',this._onKey);
+    }
+    update(){
+      if(!this.started||this.dead)return;
+      const{W,H}=this;
+      this.frame++;
+      this.bird.vy+=this.G;this.bird.y+=this.bird.vy;
+      if(this.bird.y+this.bird.r>H-35){this.bird.y=H-35-this.bird.r;this.dead=true;}
+      if(this.bird.y-this.bird.r<0){this.bird.y=this.bird.r;this.bird.vy=0;}
+      this.nextPipe--;
+      if(this.nextPipe<=0){
+        const topH=60+Math.random()*(H-200-this.GAP);
+        this.pipes.push({x:W+this.PW,topH,botY:topH+this.GAP,scored:false});
+        this.nextPipe=90+Math.floor(Math.random()*30);
+      }
+      for(const p of this.pipes){
+        p.x-=this.PS+(this.score*0.04);
+        if(!p.scored&&p.x+this.PW<this.bird.x){p.scored=true;this.score++;}
+        const bx=this.bird.x,by=this.bird.y,br=this.bird.r;
+        if(bx+br>p.x&&bx-br<p.x+this.PW){
+          if(by-br<p.topH||by+br>p.botY)this.dead=true;
+        }
+      }
+      this.pipes=this.pipes.filter(p=>p.x+this.PW>0);
+      this.stars.forEach(s=>{s.twinkle+=0.04;});
+    }
+    draw(){
+      const{ctx,W,H,bird}=this;
+      // Sky
+      const sky=ctx.createLinearGradient(0,0,0,H);
+      sky.addColorStop(0,'#070714');sky.addColorStop(1,'#0d0730');
+      ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+      // Stars
+      this.stars.forEach(s=>{
+        ctx.globalAlpha=0.3+Math.sin(s.twinkle)*0.3;
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+      });
+      ctx.globalAlpha=1;
+      // Pipes
+      this.pipes.forEach(p=>{
+        ctx.shadowColor='#7209b7';ctx.shadowBlur=12;
+        ctx.fillStyle='#3a0ca3';
+        ctx.fillRect(p.x,0,this.PW,p.topH);
+        ctx.fillRect(p.x,p.botY,this.PW,H-p.botY);
+        ctx.fillStyle='#7209b7';
+        ctx.fillRect(p.x-6,p.topH-18,this.PW+12,18);
+        ctx.fillRect(p.x-6,p.botY,this.PW+12,18);
+        ctx.shadowBlur=0;
+      });
+      // Ground
+      ctx.fillStyle='#13131f';ctx.fillRect(0,H-35,W,35);
+      ctx.shadowColor='#00f5d4';ctx.shadowBlur=8;
+      ctx.fillStyle='#00f5d4';ctx.fillRect(0,H-36,W,2);ctx.shadowBlur=0;
+      // Bird
+      const bg=ctx.createRadialGradient(bird.x,bird.y,0,bird.x,bird.y,bird.r);
+      bg.addColorStop(0,'#fff');bg.addColorStop(0.4,'#00f5d4');bg.addColorStop(1,'rgba(0,245,212,0)');
+      ctx.shadowColor='#00f5d4';ctx.shadowBlur=28;
+      ctx.fillStyle=bg;ctx.beginPath();ctx.arc(bird.x,bird.y,bird.r,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;
+      // Score
+      ctx.shadowColor='rgba(255,255,255,0.8)';ctx.shadowBlur=12;
+      ctx.fillStyle='#fff';ctx.font='bold 32px Orbitron,monospace';ctx.textAlign='center';
+      ctx.fillText(this.score,W/2,52);ctx.shadowBlur=0;
+      // Overlays
+      if(!this.started){
+        ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#00f5d4';ctx.shadowBlur=22;
+        ctx.fillStyle='#00f5d4';ctx.font='bold 24px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('FLAPPY ORB',W/2,H/2-22);ctx.shadowBlur=0;
+        ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='14px Rajdhani,sans-serif';
+        ctx.fillText('المس / اضغط SPACE للقفز',W/2,H/2+14);
+      }
+      if(this.dead){
+        ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#f72585';ctx.shadowBlur=28;
+        ctx.fillStyle='#f72585';ctx.font='bold 28px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('CRASHED!',W/2,H/2-30);ctx.shadowBlur=0;
+        ctx.fillStyle='#ffd166';ctx.font='bold 20px Orbitron,monospace';ctx.fillText('SCORE: '+this.score,W/2,H/2+10);
+        ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px Rajdhani,sans-serif';ctx.fillText('المس للعب مجدداً',W/2,H/2+42);
+      }
+    }
+    loop(){if(!this.active)return;this.update();this.draw();this.animId=requestAnimationFrame(()=>this.loop());}
+    start(){this.active=true;this.animId=requestAnimationFrame(()=>this.loop());}
+    stop(){this.active=false;if(this.animId)cancelAnimationFrame(this.animId);}
+  }
+
+  // ═══════════════════════════════════════════════
+  //  GAME 4: PIXEL DASH
+  // ═══════════════════════════════════════════════
+  class DashGame{
+    constructor(canvas){
+      this.canvas=canvas;
+      const{W,H,ctx}=sizeCanvas(canvas);
+      this.W=W;this.H=H;this.ctx=ctx;
+      this.G=0.58;this.JF=-12;this.BASE=4;
+      this.active=false;this.animId=null;
+      this.reset();
+      this.bindEvents();
+      this.draw();
+    }
+    reset(){
+      this.groundY=this.H-75;
+      this.player={x:80,y:this.groundY-40,w:28,h:40,vy:0,jumps:0,maxJ:2};
+      this.obs=[];this.score=0;this.spd=this.BASE;
+      this.frame=0;this.dead=false;this.started=false;this.nextObs=120;
+      this.stars=Array.from({length:40},()=>({x:Math.random()*this.W,y:Math.random()*(this.groundY-60),spd:Math.random()*1+0.5}));
+    }
+    jump(){
+      if(!this.started){this.started=true;return;}
+      if(this.dead){this.reset();return;}
+      if(this.player.jumps<this.player.maxJ){this.player.vy=this.JF;this.player.jumps++;}
+    }
+    bindEvents(){
+      this._onKey=e=>{if((e.code==='Space'||e.key==='ArrowUp')&&this.active){e.preventDefault();this.jump();}};
+      document.addEventListener('keydown',this._onKey);
+      this.canvas.addEventListener('click',()=>{if(this.active)this.jump();});
+      this.canvas.addEventListener('touchstart',e=>{e.preventDefault();if(this.active)this.jump();},{passive:false});
+    }
+    update(){
+      if(!this.started||this.dead)return;
+      const p=this.player;
+      this.frame++;this.score=Math.floor(this.frame/6);
+      this.spd=this.BASE+Math.floor(this.frame/200)*0.6;
+      p.vy+=this.G;p.y+=p.vy;
+      if(p.y>=this.groundY-p.h){p.y=this.groundY-p.h;p.vy=0;p.jumps=0;}
+      this.nextObs-=this.spd;
+      if(this.nextObs<=0){
+        const h=35+Math.random()*40, w=18+Math.random()*18;
+        this.obs.push({x:this.W+30,y:this.groundY-h,w,h});
+        this.nextObs=130+Math.random()*90;
+      }
+      this.obs.forEach(o=>o.x-=this.spd);
+      this.obs=this.obs.filter(o=>o.x+o.w>0);
+      for(const o of this.obs){
+        if(p.x+p.w-6>o.x&&p.x+6<o.x+o.w&&p.y+p.h-4>o.y&&p.y+4<o.y+o.h){this.dead=true;break;}
+      }
+      this.stars.forEach(s=>{s.x-=s.spd*this.spd*0.3;if(s.x<0)s.x=this.W;});
+    }
+    draw(){
+      const{ctx,W,H}=this;const p=this.player;
+      ctx.fillStyle='#07070e';ctx.fillRect(0,0,W,H);
+      // Stars
+      this.stars.forEach(s=>{
+        ctx.fillStyle='rgba(255,255,255,0.4)';ctx.beginPath();ctx.arc(s.x,s.y,s.spd*0.4+0.3,0,Math.PI*2);ctx.fill();
+      });
+      // Ground
+      ctx.fillStyle='#13131f';ctx.fillRect(0,this.groundY,W,H-this.groundY);
+      ctx.shadowColor='#00f5d4';ctx.shadowBlur=8;
+      ctx.fillStyle='#00f5d4';ctx.fillRect(0,this.groundY,W,2);ctx.shadowBlur=0;
+      const offset=(this.frame*this.spd*0.8)%70;
+      ctx.fillStyle='rgba(0,245,212,0.1)';
+      for(let x=-offset;x<W;x+=70)ctx.fillRect(x,this.groundY+10,45,2);
+      // Obstacles
+      this.obs.forEach(o=>{
+        ctx.shadowColor='#f72585';ctx.shadowBlur=10;
+        ctx.fillStyle='#f72585';ctx.fillRect(o.x,o.y,o.w,o.h);
+        ctx.fillStyle='#ff006e';ctx.fillRect(o.x+3,o.y+3,o.w-6,o.h-6);
+        ctx.shadowBlur=0;
+      });
+      // Player
+      ctx.shadowColor='#00f5d4';ctx.shadowBlur=14;
+      ctx.fillStyle='#00f5d4';ctx.fillRect(p.x,p.y,p.w,p.h);
+      ctx.shadowBlur=0;
+      ctx.fillStyle='#07070e';ctx.fillRect(p.x+4,p.y+5,p.w-8,14);
+      ctx.fillStyle='#f72585';ctx.fillRect(p.x+6,p.y+8,5,5);ctx.fillRect(p.x+p.w-11,p.y+8,5,5);
+      ctx.fillStyle='rgba(0,245,212,0.25)';ctx.fillRect(p.x+5,p.y+22,p.w-10,2);
+      // HUD
+      ctx.shadowColor='#00f5d4';ctx.shadowBlur=8;
+      ctx.fillStyle='#00f5d4';ctx.font='bold 14px Orbitron,monospace';ctx.textAlign='left';
+      ctx.fillText('SCORE: '+this.score,12,28);ctx.shadowBlur=0;
+      ctx.fillStyle='#f72585';ctx.textAlign='right';
+      ctx.fillText('SPD: '+this.spd.toFixed(1),W-12,28);
+      // Overlays
+      if(!this.started){
+        ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#00f5d4';ctx.shadowBlur=22;
+        ctx.fillStyle='#00f5d4';ctx.font='bold 24px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('PIXEL DASH',W/2,H/2-26);ctx.shadowBlur=0;
+        ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='14px Rajdhani,sans-serif';
+        ctx.fillText('SPACE / المس للقفز',W/2,H/2+10);
+        ctx.fillText('قفزتان مسموح ↑↑',W/2,H/2+30);
+      }
+      if(this.dead){
+        ctx.fillStyle='rgba(0,0,0,0.8)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#f72585';ctx.shadowBlur=28;
+        ctx.fillStyle='#f72585';ctx.font='bold 28px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('CRASHED!',W/2,H/2-30);ctx.shadowBlur=0;
+        ctx.fillStyle='#ffd166';ctx.font='bold 20px Orbitron,monospace';ctx.fillText('SCORE: '+this.score,W/2,H/2+10);
+        ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px Rajdhani,sans-serif';ctx.fillText('المس لإعادة المحاولة',W/2,H/2+42);
+      }
+    }
+    loop(){if(!this.active)return;this.update();this.draw();this.animId=requestAnimationFrame(()=>this.loop());}
+    start(){this.active=true;this.animId=requestAnimationFrame(()=>this.loop());}
+    stop(){this.active=false;if(this.animId)cancelAnimationFrame(this.animId);}
+  }
+
+  // ═══════════════════════════════════════════════
+  //  GAME 5: MEMORY MATRIX
+  // ═══════════════════════════════════════════════
+  class MemoryGame{
+    constructor(canvas){
+      this.canvas=canvas;
+      const{W,H,ctx}=sizeCanvas(canvas);
+      this.W=W;this.H=H;this.ctx=ctx;
+      this.symbols=['⚡','🌙','⭐','💎','🔮','🌀','🎯','🔥'];
+      this.active=false;this.animId=null;
+      this.reset();
+      this.bindEvents();
+      this.draw();
+    }
+    reset(){
+      const pairs=[...this.symbols,...this.symbols];
+      for(let i=pairs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pairs[i],pairs[j]]=[pairs[j],pairs[i]];}
+      this.cards=pairs.map((sym,i)=>({sym,i,col:i%4,row:Math.floor(i/4),flipped:false,matched:false,scale:1}));
+      this.sel=[];this.moves=0;this.matches=0;this.locked=false;
+      this.won=false;this.started=false;this.startT=null;this.elapsed=0;
+    }
+    layout(){
+      const{W,H}=this;
+      const cols=4,rows=4,gx=10,gy=10,pad=18;
+      const cW=(W-pad*2-gx*(cols-1))/cols;
+      const cH=(H-95-gy*(rows-1))/rows;
+      return{cW,cH,padX:pad,padY:80,gx,gy};
+    }
+    bindEvents(){
+      const handle=e=>{
+        if(!this.active)return;
+        const rect=this.canvas.getBoundingClientRect();
+        const mx=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+        const my=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+        this.handleClick(mx,my);
+      };
+      this.canvas.addEventListener('click',handle);
+      this.canvas.addEventListener('touchstart',e=>{e.preventDefault();handle(e);},{passive:false});
+    }
+    handleClick(mx,my){
+      if(this.locked)return;
+      if(this.won){this.reset();return;}
+      if(!this.started){this.started=true;this.startT=Date.now();}
+      const{cW,cH,padX,padY,gx,gy}=this.layout();
+      for(const c of this.cards){
+        const cx=padX+c.col*(cW+gx), cy=padY+c.row*(cH+gy);
+        if(mx>=cx&&mx<=cx+cW&&my>=cy&&my<=cy+cH){
+          if(c.flipped||c.matched)return;
+          c.flipped=true;this.sel.push(c);this.moves++;
+          if(this.sel.length===2){
+            this.locked=true;
+            const[a,b]=this.sel;
+            if(a.sym===b.sym){
+              setTimeout(()=>{a.matched=b.matched=true;this.matches++;this.sel=[];this.locked=false;
+                if(this.matches===this.symbols.length){this.won=true;this.elapsed=Date.now()-this.startT;}
+              },500);
+            }else{
+              setTimeout(()=>{a.flipped=b.flipped=false;this.sel=[];this.locked=false;},900);
+            }
+          }
+          return;
+        }
+      }
+    }
+    draw(){
+      const{ctx,W,H}=this;
+      const{cW,cH,padX,padY,gx,gy}=this.layout();
+      // BG
+      ctx.fillStyle='#07070e';ctx.fillRect(0,0,W,H);
+      // Header
+      ctx.shadowColor='#7209b7';ctx.shadowBlur=18;
+      ctx.fillStyle='#c77dff';ctx.font='bold 17px Orbitron,monospace';ctx.textAlign='center';
+      ctx.fillText('MEMORY MATRIX',W/2,32);ctx.shadowBlur=0;
+      ctx.fillStyle='#00f5d4';ctx.font='bold 12px Orbitron,monospace';ctx.textAlign='left';
+      ctx.fillText('MOVES: '+this.moves,18,58);
+      ctx.fillStyle='#f72585';ctx.textAlign='right';
+      ctx.fillText('PAIRS: '+this.matches+'/'+this.symbols.length,W-18,58);
+      // Cards
+      this.cards.forEach(c=>{
+        const cx=padX+c.col*(cW+gx),cy=padY+c.row*(cH+gy);
+        if(c.matched){
+          ctx.shadowColor='#00f5d4';ctx.shadowBlur=14;
+          ctx.fillStyle='rgba(0,245,212,0.12)';ctx.strokeStyle='#00f5d4';ctx.lineWidth=1.5;
+        }else if(c.flipped){
+          ctx.shadowColor='#f72585';ctx.shadowBlur=10;
+          ctx.fillStyle='rgba(247,37,133,0.12)';ctx.strokeStyle='#f72585';ctx.lineWidth=1.5;
+        }else{
+          ctx.shadowBlur=0;
+          ctx.fillStyle='rgba(114,9,183,0.18)';ctx.strokeStyle='rgba(114,9,183,0.45)';ctx.lineWidth=1;
+        }
+        ctx.beginPath();ctx.roundRect(cx,cy,cW,cH,8);ctx.fill();ctx.stroke();ctx.shadowBlur=0;
+        if(c.flipped||c.matched){
+          ctx.font=Math.min(cW,cH)*0.5+'px serif';
+          ctx.textAlign='center';ctx.fillStyle='#fff';
+          ctx.fillText(c.sym,cx+cW/2,cy+cH/2+Math.min(cW,cH)*0.18);
+        }else{
+          ctx.fillStyle='rgba(114,9,183,0.5)';ctx.font='bold 16px Orbitron,monospace';
+          ctx.textAlign='center';ctx.fillText('?',cx+cW/2,cy+cH/2+6);
+        }
+      });
+      // Overlays
+      if(!this.started){
+        ctx.fillStyle='rgba(0,0,0,0.62)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#c77dff';ctx.shadowBlur=22;
+        ctx.fillStyle='#c77dff';ctx.font='bold 22px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('MEMORY MATRIX',W/2,H/2-22);ctx.shadowBlur=0;
+        ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='14px Rajdhani,sans-serif';
+        ctx.fillText('المس البطاقات لمطابقة الأزواج',W/2,H/2+14);
+      }
+      if(this.won){
+        ctx.fillStyle='rgba(0,0,0,0.82)';ctx.fillRect(0,0,W,H);
+        ctx.shadowColor='#00f5d4';ctx.shadowBlur=30;
+        ctx.fillStyle='#00f5d4';ctx.font='bold 28px Orbitron,monospace';ctx.textAlign='center';
+        ctx.fillText('أحسنت! 🎉',W/2,H/2-40);ctx.shadowBlur=0;
+        ctx.fillStyle='#ffd166';ctx.font='bold 16px Orbitron,monospace';
+        ctx.fillText('الحركات: '+this.moves,W/2,H/2+2);
+        ctx.fillStyle='#c77dff';ctx.font='14px Orbitron,monospace';
+        ctx.fillText('الوقت: '+(this.elapsed/1000).toFixed(1)+'s',W/2,H/2+28);
+        ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px Rajdhani,sans-serif';
+        ctx.fillText('المس لإعادة اللعب',W/2,H/2+58);
+      }
+    }
+    loop(){if(!this.active)return;this.draw();this.animId=requestAnimationFrame(()=>this.loop());}
+    start(){this.active=true;this.animId=requestAnimationFrame(()=>this.loop());}
+    stop(){this.active=false;if(this.animId)cancelAnimationFrame(this.animId);}
+  }
+
+  // ═══════════════════════════════════════════════
+  //  INIT ALL GAMES
+  // ═══════════════════════════════════════════════
+  const games={
+    snake:   new SnakeGame(document.getElementById('c-snake')),
+    breakout:new BreakoutGame(document.getElementById('c-breakout')),
+    flappy:  new FlappyGame(document.getElementById('c-flappy')),
+    dash:    new DashGame(document.getElementById('c-dash')),
+    memory:  new MemoryGame(document.getElementById('c-memory')),
+  };
+
+  // Start first game
+  games.snake.start();
+
+  // ─── Intersection Observer ───
+  const observer=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      const id=entry.target.dataset.game;
+      if(!games[id])return;
+      if(entry.intersectionRatio>0.7){
+        if(!games[id].active)games[id].start();
+      }else{
+        if(games[id].active)games[id].stop();
+      }
+    });
+  },{threshold:0.7});
+
+  document.querySelectorAll('.game-section').forEach(s=>observer.observe(s));
+
+  // ─── Auto-hide hints ───
+  document.querySelectorAll('.ctrl-hint').forEach(h=>{
+    setTimeout(()=>h.style.opacity='0',4000);
+  });
+
+  // ─── Resize handler ───
+  let resizeT;
+  window.addEventListener('resize',()=>{
+    clearTimeout(resizeT);
+    resizeT=setTimeout(()=>{
+      Object.entries(games).forEach(([k,g])=>{
+        const was=g.active;
+        g.stop();
+        const{W,H,ctx}=sizeCanvas(g.canvas);
+        g.W=W;g.H=H;g.ctx=ctx;
+        if(g.groundY!==undefined)g.groundY=H-75;
+        if(was)g.start();
+        else g.draw();
+      });
+    },150);
+  });
+
+  </script>
+</body>
+</html>
